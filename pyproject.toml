@@ -1,0 +1,21 @@
+[project]
+name = "hello"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Qudrat Ullah", email = "qudratullah0708@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.11",
+    "sqlalchemy>=2.0.38",
+    "uvicorn>=0.34.0",
+]
+
+[project.scripts]
+hello = "hello.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo & Reminder App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold text-center my-6">Personal Organizer</h1>
+
+        <!-- API Configuration -->
+        <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+            <div class="flex flex-col md:flex-row gap-2 items-center">
+                <label for="api-endpoint" class="font-medium min-w-32">Backend API:</label>
+                <input type="text" id="api-endpoint" value="http://127.0.0.1:8000"
+                    class="flex-grow p-2 border rounded-md">
+                <button id="save-endpoint" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                    Save & Reload
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Example: http://127.0.0.1:8000 (no trailing slash)</p>
+        </div>
+
+        <!-- Connection Status -->
+        <div id="connection-status" class="mb-6 text-center py-2 px-4 rounded-md hidden">
+            <!-- Status will be shown here -->
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex justify-center mb-6">
+            <nav class="flex space-x-4 bg-white p-2 rounded-lg shadow">
+                <button id="nav-todos" class="px-4 py-2 bg-blue-500 text-white rounded-md">Todos</button>
+                <button id="nav-reminders" class="px-4 py-2 hover:bg-gray-200 rounded-md">Reminders</button>
+                <button id="nav-calendar" class="px-4 py-2 hover:bg-gray-200 rounded-md">Calendar</button>
+            </nav>
+        </div>
+
+        <!-- Todo Section -->
+        <div id="todos-section" class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold mb-4">Todo List</h2>
+
+            <!-- Add Todo Form -->
+            <form id="todo-form" class="mb-6">
+                <div class="flex flex-col md:flex-row gap-2">
+                    <input type="text" id="todo-title" placeholder="Enter title" class="flex-grow p-2 border rounded-md"
+                        required>
+                    <input type="text" id="todo-description" placeholder="Enter description (optional)"
+                        class="flex-grow p-2 border rounded-md">
+                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+                        Add Todo
+                    </button>
+                </div>
+            </form>
+
+            <!-- Todo List -->
+            <div id="todo-list" class="space-y-2">
+                <!-- Todos will be inserted here by JS -->
+                <div class="text-center text-gray-500">Loading todos...</div>
+            </div>
+        </div>
+
+        <!-- Reminders Section -->
+        <div id="reminders-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Reminders</h2>
+
+            <!-- Add Reminder Form -->
+            <form id="reminder-form" class="mb-6">
+                <div class="flex flex-col md:flex-row gap-2">
+                    <input type="text" id="reminder-text" placeholder="Enter reminder"
+                        class="flex-grow p-2 border rounded-md" required>
+                    <select id="reminder-importance" class="p-2 border rounded-md" required>
+                        <option value="">Select importance</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+                        Add Reminder
+                    </button>
+                </div>
+            </form>
+
+            <!-- Reminders List -->
+            <div id="reminders-list" class="space-y-2">
+                <!-- Reminders will be inserted here by JS -->
+                <div class="text-center text-gray-500">Loading reminders...</div>
+            </div>
+        </div>
+
+        <!-- Calendar Section -->
+        <div id="calendar-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Calendar Events</h2>
+
+            <!-- Add Calendar Event Form -->
+            <form id="calendar-form" class="mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="event-title" placeholder="Event title" class="p-2 border rounded-md"
+                        required>
+                    <input type="text" id="event-description" placeholder="Event description"
+                        class="p-2 border rounded-md">
+                    <div class="flex flex-col">
+                        <label for="event-from" class="text-sm text-gray-600">Start</label>
+                        <input type="datetime-local" id="event-from" class="p-2 border rounded-md" required>
+                    </div>
+                    <div class="flex flex-col">
+                        <label for="event-to" class="text-sm text-gray-600">End</label>
+                        <input type="datetime-local" id="event-to" class="p-2 border rounded-md" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit"
+                            class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+                            Add Event
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Calendar Events List -->
+            <div id="calendar-list" class="space-y-4">
+                <!-- Events will be inserted here by JS -->
+                <div class="text-center text-gray-500">Loading events...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // API Endpoint Configuration
+        let apiEndpoint = localStorage.getItem('apiEndpoint') || 'http://127.0.0.1:8000';
+        const apiEndpointInput = document.getElementById('api-endpoint');
+        const saveEndpointButton = document.getElementById('save-endpoint');
+        const connectionStatus = document.getElementById('connection-status');
+
+        // Set the saved endpoint in the input field
+        apiEndpointInput.value = apiEndpoint;
+
+        // Global variable to store the current tool call ID
+        let toolCallId = 1;
+
+        // DOM Elements
+        const navTodos = document.getElementById('nav-todos');
+        const navReminders = document.getElementById('nav-reminders');
+        const navCalendar = document.getElementById('nav-calendar');
+
+        const todosSection = document.getElementById('todos-section');
+        const remindersSection = document.getElementById('reminders-section');
+        const calendarSection = document.getElementById('calendar-section');
+
+        const todoForm = document.getElementById('todo-form');
+        const todoTitle = document.getElementById('todo-title');
+        const todoDescription = document.getElementById('todo-description');
+        const todoList = document.getElementById('todo-list');
+
+        const reminderForm = document.getElementById('reminder-form');
+        const reminderText = document.getElementById('reminder-text');
+        const reminderImportance = document.getElementById('reminder-importance');
+        const remindersList = document.getElementById('reminders-list');
+
+        const calendarForm = document.getElementById('calendar-form');
+        const eventTitle = document.getElementById('event-title');
+        const eventDescription = document.getElementById('event-description');
+        const eventFrom = document.getElementById('event-from');
+        const eventTo = document.getElementById('event-to');
+        const calendarList = document.getElementById('calendar-list');
+
+        // Save API Endpoint
+        saveEndpointButton.addEventListener('click', () => {
+            const newEndpoint = apiEndpointInput.value.trim();
+            if (newEndpoint) {
+                // Remove trailing slash if present
+                const formattedEndpoint = newEndpoint.endsWith('/')
+                    ? newEndpoint.slice(0, -1)
+                    : newEndpoint;
+
+                localStorage.setItem('apiEndpoint', formattedEndpoint);
+                apiEndpoint = formattedEndpoint;
+
+                // Test connection to the new endpoint
+                testApiConnection();
+            }
+        });
+
+        // Test API Connection
+        async function testApiConnection() {
+            connectionStatus.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+            connectionStatus.classList.add('bg-yellow-100', 'text-yellow-800');
+            connectionStatus.innerHTML = `Testing connection to ${apiEndpoint}...`;
+
+            try {
+                const response = await fetch(`${apiEndpoint}/`);
+                if (response.ok) {
+                    connectionStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                    connectionStatus.classList.add('bg-green-100', 'text-green-800');
+                    connectionStatus.innerHTML = `✅ Connected successfully to ${apiEndpoint}`;
+
+                    // Reload the data
+                    fetchTodos();
+                } else {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+            } catch (error) {
+                connectionStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                connectionStatus.classList.add('bg-red-100', 'text-red-800');
+                connectionStatus.innerHTML = `❌ Failed to connect to ${apiEndpoint}: ${error.message}`;
+            }
+
+            // Hide status after 5 seconds
+            setTimeout(() => {
+                connectionStatus.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Navigation
+        navTodos.addEventListener('click', () => {
+            setActiveTab(navTodos);
+            showSection(todosSection);
+            fetchTodos();
+        });
+
+        navReminders.addEventListener('click', () => {
+            setActiveTab(navReminders);
+            showSection(remindersSection);
+            fetchReminders();
+        });
+
+        navCalendar.addEventListener('click', () => {
+            setActiveTab(navCalendar);
+            showSection(calendarSection);
+            fetchCalendarEvents();
+        });
+
+        function setActiveTab(activeTab) {
+            [navTodos, navReminders, navCalendar].forEach(tab => {
+                tab.classList.remove('bg-blue-500', 'text-white');
+                tab.classList.add('hover:bg-gray-200');
+            });
+
+            activeTab.classList.remove('hover:bg-gray-200');
+            activeTab.classList.add('bg-blue-500', 'text-white');
+        }
+
+        function showSection(section) {
+            [todosSection, remindersSection, calendarSection].forEach(s => {
+                s.classList.add('hidden');
+            });
+
+            section.classList.remove('hidden');
+        }
+
+        // API Calls Helper
+        async function apiCall(endpoint, functionName, args = {}) {
+            try {
+                const response = await axios.post(`${apiEndpoint}${endpoint}`, {
+                    message: {
+                        toolCalls: [
+                            {
+                                id: `call-${toolCallId++}`,
+                                function: {
+                                    name: functionName,
+                                    arguments: JSON.stringify(args)
+                                }
+                            }
+                        ]
+                    }
+                });
+
+                console.log(response.status)
+                return response.data.results[0].result;
+            } catch (error) {
+                console.error(`Error calling ${functionName}:`, error);
+
+                // Check if it's a connection error
+                if (error.message.includes('Network Error')) {
+                    connectionStatus.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-yellow-100', 'text-yellow-800');
+                    connectionStatus.classList.add('bg-red-100', 'text-red-800');
+                    connectionStatus.innerHTML = `❌ Failed to connect to ${apiEndpoint}. Please check if the server is running.`;
+                } else {
+                    alert(`Error: ${error.response?.data?.detail || error.message}`);
+                }
+
+                throw error;
+            }
+        }
+
+        // Todo Functions
+        async function fetchTodos() {
+            todoList.innerHTML = '<div class="text-center text-gray-500">Loading todos...</div>';
+
+            try {
+                const todos = await apiCall('/get_todos/', 'getTodos');
+
+                if (todos.length === 0) {
+                    todoList.innerHTML = '<div class="text-center text-gray-500">No todos yet. Add one above!</div>';
+                    return;
+                }
+
+                todoList.innerHTML = '';
+                todos.forEach(todo => {
+                    const todoItem = document.createElement('div');
+                    todoItem.className = `p-3 border rounded-md ${todo.completed ? 'bg-gray-100' : ''}`;
+                    todoItem.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div class="${todo.completed ? 'line-through text-gray-500' : ''}">
+                                <h3 class="font-medium">${todo.title}</h3>
+                                ${todo.description ? `<p class="text-sm text-gray-600">${todo.description}</p>` : ''}
+                            </div>
+                            <div class="flex space-x-2">
+                                ${!todo.completed ? `
+                                    <button 
+                                        class="complete-todo bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600"
+                                        data-id="${todo.id}"
+                                    >
+                                        Complete
+                                    </button>
+                                ` : ''}
+                                <button 
+                                    class="delete-todo bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
+                                    data-id="${todo.id}"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    todoList.appendChild(todoItem);
+                });
+
+                // Add event listeners for the dynamically created buttons
+                document.querySelectorAll('.complete-todo').forEach(button => {
+                    button.addEventListener('click', completeTodo);
+                });
+
+                document.querySelectorAll('.delete-todo').forEach(button => {
+                    button.addEventListener('click', deleteTodo);
+                });
+            } catch (error) {
+                todoList.innerHTML = '<div class="text-center text-red-500">Error loading todos!</div>';
+            }
+        }
+
+        async function addTodo(e) {
+            e.preventDefault();
+
+            const title = todoTitle.value.trim();
+            const description = todoDescription.value.trim();
+
+            if (!title) return;
+
+            try {
+                await apiCall('/create_todo/', 'createTodo', { title, description });
+                todoTitle.value = '';
+                todoDescription.value = '';
+                fetchTodos();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        async function completeTodo(e) {
+            const todoId = parseInt(e.target.dataset.id);
+
+            try {
+                await apiCall('/complete_todo/', 'completeTodo', { id: todoId });
+                fetchTodos();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        async function deleteTodo(e) {
+            const todoId = parseInt(e.target.dataset.id);
+
+            if (!confirm('Are you sure you want to delete this todo?')) return;
+
+            try {
+                await apiCall('/delete_todo/', 'deleteTodo', { id: todoId });
+                fetchTodos();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        // Reminder Functions
+        async function fetchReminders() {
+            remindersList.innerHTML = '<div class="text-center text-gray-500">Loading reminders...</div>';
+
+            try {
+                const reminders = await apiCall('/get_reminders/', 'getReminders');
+
+                if (reminders.length === 0) {
+                    remindersList.innerHTML = '<div class="text-center text-gray-500">No reminders yet. Add one above!</div>';
+                    return;
+                }
+
+                remindersList.innerHTML = '';
+                reminders.forEach(reminder => {
+                    const importanceColor = {
+                        'low': 'bg-blue-100 border-blue-200',
+                        'medium': 'bg-yellow-100 border-yellow-200',
+                        'high': 'bg-red-100 border-red-200'
+                    }[reminder.importance] || 'bg-gray-100 border-gray-200';
+
+                    const reminderItem = document.createElement('div');
+                    reminderItem.className = `p-3 border rounded-md ${importanceColor}`;
+                    reminderItem.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="font-medium">${reminder.reminder_text}</h3>
+                                <span class="inline-block px-2 py-1 text-xs rounded-full bg-white">
+                                    ${reminder.importance.charAt(0).toUpperCase() + reminder.importance.slice(1)} priority
+                                </span>
+                            </div>
+                            <button 
+                                class="delete-reminder bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
+                                data-id="${reminder.id}"
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    `;
+                    remindersList.appendChild(reminderItem);
+                });
+
+                // Add event listeners for the dynamically created buttons
+                document.querySelectorAll('.delete-reminder').forEach(button => {
+                    button.addEventListener('click', deleteReminder);
+                });
+            } catch (error) {
+                remindersList.innerHTML = '<div class="text-center text-red-500">Error loading reminders!</div>';
+            }
+        }
+
+        async function addReminder(e) {
+            e.preventDefault();
+
+            const reminderText = document.getElementById('reminder-text').value.trim();
+            const importance = document.getElementById('reminder-importance').value;
+
+            if (!reminderText || !importance) return;
+
+            try {
+                await apiCall('/add_reminder/', 'addReminder', { reminder_text: reminderText, importance });
+                document.getElementById('reminder-text').value = '';
+                document.getElementById('reminder-importance').value = '';
+                fetchReminders();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        async function deleteReminder(e) {
+            const reminderId = parseInt(e.target.dataset.id);
+
+            if (!confirm('Are you sure you want to delete this reminder?')) return;
+
+            try {
+                await apiCall('/delete_reminder/', 'deleteReminder', { id: reminderId });
+                fetchReminders();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        // Calendar Functions
+        async function fetchCalendarEvents() {
+            calendarList.innerHTML = '<div class="text-center text-gray-500">Loading events...</div>';
+
+            try {
+                const events = await apiCall('/get_calendar_entries/', 'getCalendarEntries');
+
+                if (events.length === 0) {
+                    calendarList.innerHTML = '<div class="text-center text-gray-500">No events yet. Add one above!</div>';
+                    return;
+                }
+
+                // Sort events by start date
+                events.sort((a, b) => new Date(a.event_from) - new Date(b.event_from));
+
+                calendarList.innerHTML = '';
+                events.forEach(event => {
+                    const startDate = new Date(event.event_from);
+                    const endDate = new Date(event.event_to);
+
+                    const formatDate = (date) => {
+                        return date.toLocaleString('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit'
+                        });
+                    };
+
+                    // Check if event is in the past
+                    const isPast = endDate < new Date();
+
+                    const eventItem = document.createElement('div');
+                    eventItem.className = `p-4 border rounded-md ${isPast ? 'bg-gray-100' : 'bg-blue-50'}`;
+                    eventItem.innerHTML = `
+                        <div class="flex flex-col md:flex-row justify-between">
+                            <div class="${isPast ? 'text-gray-500' : ''}">
+                                <h3 class="font-medium text-lg">${event.title}</h3>
+                                ${event.description ? `<p class="text-sm text-gray-600">${event.description}</p>` : ''}
+                                <div class="mt-2">
+                                    <div class="text-sm">
+                                        <span class="font-medium">Start:</span> ${formatDate(startDate)}
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="font-medium">End:</span> ${formatDate(endDate)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4 md:mt-0">
+                                <button 
+                                    class="delete-event bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
+                                    data-id="${event.id}"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    calendarList.appendChild(eventItem);
+                });
+
+                // Add event listeners for the dynamically created buttons
+                document.querySelectorAll('.delete-event').forEach(button => {
+                    button.addEventListener('click', deleteCalendarEvent);
+                });
+            } catch (error) {
+                calendarList.innerHTML = '<div class="text-center text-red-500">Error loading events!</div>';
+            }
+        }
+
+        async function addCalendarEvent(e) {
+            e.preventDefault();
+
+            const title = eventTitle.value.trim();
+            const description = eventDescription.value.trim();
+            const startDateTime = eventFrom.value;
+            const endDateTime = eventTo.value;
+
+            if (!title || !startDateTime || !endDateTime) return;
+
+            try {
+                await apiCall('/add_calendar_entry/', 'addCalendarEntry', {
+                    title,
+                    description,
+                    event_from: startDateTime,
+                    event_to: endDateTime
+                });
+
+                eventTitle.value = '';
+                eventDescription.value = '';
+                eventFrom.value = '';
+                eventTo.value = '';
+
+                fetchCalendarEvents();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        async function deleteCalendarEvent(e) {
+            const eventId = parseInt(e.target.dataset.id);
+
+            if (!confirm('Are you sure you want to delete this event?')) return;
+
+            try {
+                await apiCall('/delete_calendar_entry/', 'deleteCalendarEntry', { id: eventId });
+                fetchCalendarEvents();
+            } catch (error) {
+                // Error is handled in apiCall
+            }
+        }
+
+        // Event Listeners
+        todoForm.addEventListener('submit', addTodo);
+        reminderForm.addEventListener('submit', addReminder);
+        calendarForm.addEventListener('submit', addCalendarEvent);
+
+        // Initialize the app
+        window.addEventListener('DOMContentLoaded', () => {
+            // Check connection to API endpoint
+            testApiConnection();
+        });
+    </script>
+</body>
+
+</html>
